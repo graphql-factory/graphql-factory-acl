@@ -1,0 +1,58 @@
+{
+  "name": "graphql-factory-acl",
+  "version": "0.1.0",
+  "description": "ACL Middleware for GraphQL Factory",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/graphql-factory/graphql-factory-acl.git"
+  },
+  "keywords": [
+    "graphql",
+    "middleware",
+    "acl",
+    "resolve",
+    "auth",
+    "authn",
+    "authenticate",
+    "authentication"
+  ],
+  "author": "Branden Horiuchi <bhoriuchi@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/graphql-factory/graphql-factory-acl/issues"
+  },
+  "homepage": "https://github.com/graphql-factory/graphql-factory-acl#readme",
+  "dependencies": {
+    "jsonwebtoken": "^8.0.1",
+    "lodash": "^4.17.4"
+  },
+  "peerDependencies": {
+    "acl": ">=0.4.11",
+    "graphql-factory": ">=2.1.0"
+  },
+  "devDependencies": {
+    "acl": "^0.4.11",
+    "acl-backend-rethinkdb": "^0.1.0",
+    "babel-core": "^6.26.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-es2015": "^6.24.1",
+    "babel-preset-es2015-rollup": "^3.0.0",
+    "babel-preset-stage-2": "^6.24.1",
+    "babel-register": "^6.26.0",
+    "babel-runtime": "^6.26.0",
+    "chai": "^4.1.2",
+    "express": "^4.16.1",
+    "express-graphql": "^0.6.11",
+    "graphql": "^0.11.6",
+    "graphql-factory": "git+https://github.com/graphql-factory/graphql-factory.git#development",
+    "mocha": "^3.5.3",
+    "rethinkdbdash": "^2.3.31",
+    "rollup": "^0.50.0",
+    "rollup-plugin-babel": "^3.0.2",
+    "subcommander": "^1.0.0"
+  }
+}
