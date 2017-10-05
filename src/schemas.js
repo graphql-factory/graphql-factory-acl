@@ -126,7 +126,7 @@ export default function schemas (plugin) {
                 })
               })
             },
-            //_factoryACL: 'read'
+            _factoryACL: 'read'
           }
         }
       },

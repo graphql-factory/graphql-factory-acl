@@ -189,7 +189,7 @@ export default class GraphQLFactoryACLPlugin {
         let { info, context } = args
         let secret = _.get(_this.options, 'secret')
         let userIdField = _.get(_this.options, 'userIdField', 'userId')
-        let schemaName = _this.schemaName
+        let schemaName = info.schema._factory.key
         let basePath = `${schemaName}.${info.fieldName}`
 
         // if not marked as an ACL continue to the next middleware
