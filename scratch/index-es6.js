@@ -4,7 +4,7 @@ import GraphQLFactory from '../../graphql-factory/src/index' // 'graphql-factory
 import definition from './definition'
 import ACLPlugin from '../src/index'
 import AccessControlList from 'acl'
-import RethinkDBACLBackend from '../../node-acl-backend-rethink/src/index' //'acl-backend-rethinkdb'
+import RethinkDBACLBackend from 'acl-backend-rethinkdb'
 import rethinkdbdash from 'rethinkdbdash'
 import http from 'http'
 import Express from 'express'

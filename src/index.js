@@ -5,11 +5,15 @@ import schemaDef from './schemas'
 const ADMIN_ROLE = 'admin'
 
 /**
- * Creates a list of resource path strings for use when evaluating permissions against the current user
+ * Creates a list of resource paths the user is requesting access to
+ * which includes not paths, query paths, and args paths
  * @param info
  * @returns {[null]}
  */
-function buildResources (info, schemaName) {
+function buildResources (info, args, schemaName) {
+  const paths = []
+  const op = _.get(info, 'operation.operation')
+
   // recursive function to traverse selections adding paths
   let traverseSelections = (selectionSet, path, paths) => {
     if (!selectionSet) return paths.push(path.join('.'))
@@ -17,15 +21,42 @@ function buildResources (info, schemaName) {
     _.forEach(selectionSet.selections, sel => {
       let p = path.slice()
       p.push(sel.name.value)
-      sel.selectionSet ? paths.push(p.concat(['*']).join('.')) : paths.push(p.join('.'))
+      if (sel.selectionSet) paths.push(p.concat('*').join('.'))
       traverseSelections(sel.selectionSet, p, paths)
     })
   }
 
-  let paths = []
+  let traverseArgs = (obj, path, paths) => {
+    if (!_.isObject(obj) || _.isArray(obj)) return paths.push(path.join('.'))
+
+    _.forEach(obj, (val, name) => {
+      let p = path.slice()
+      p.push(name)
+      if (_.isObject(obj[name]) && !_.isArray(obj[name])) {
+        paths.push(p.concat('*').join('.'))
+      }
+      traverseArgs(obj[name], p, paths)
+    })
+  }
+
   _.forEach(info.fieldNodes || info.fieldASTs, node => {
-    paths.push([schemaName, node.name.value, '*'].join('.'))
-    traverseSelections(node.selectionSet, [schemaName, node.name.value], paths)
+    const field = node.name.value
+    const base = [schemaName, op, field]
+    const notBase = [`!${schemaName}`, op, field]
+
+    paths.push('*')
+    paths.push(`${schemaName}.*`)
+    paths.push(`${schemaName}.${op}.*`)
+    paths.push(`${schemaName}.${op}.${field}.*`)
+    paths.push(`${schemaName}.${op}.${field}.query.*`)
+    paths.push(`${schemaName}.${op}.${field}.args.*`)
+
+    traverseSelections(node.selectionSet, notBase.slice().concat('query'), paths)
+    traverseSelections(node.selectionSet, base.slice().concat('query'), paths)
+    if (args) {
+      traverseArgs(args, notBase.slice().concat('args'), paths)
+      traverseArgs(args, base.slice().concat('args'), paths)
+    }
   })
 
   return [ ...new Set(paths) ]
@@ -100,21 +131,6 @@ function buildErrorList (info, keep, basePath, errors = []) {
 }
 
 /**
- * creates a resource list for the acl schema
- * @param plugin
- */
-function adminResourceList (plugin) {
-  let schemaDef = plugin.schemas[plugin.schemaName]
-
-  return _.reduce(['query', 'mutation'], (list, op) => {
-    _.forEach(schemaDef[op].fields, (def, name) => {
-      list.push([plugin.schemaName, name, '*'].join('.'))
-    })
-    return list
-  }, [])
-}
-
-/**
  * @description GraphQLFactoryACLPlugin provides granular ACL control on graphql requests.
  * It also provides a graphql api for the ACL library.
  */
@@ -133,7 +149,7 @@ export default class GraphQLFactoryACLPlugin {
 
   createAdmin () {
     let adminId = _.get(this.options, 'adminId', 'admin@localhost')
-    let resources = adminResourceList(this)
+    let resources = `${this.schemaName}.*`
     return new Promise((resolve, reject) => {
       try {
         return this.acl.addUserRoles(adminId, ADMIN_ROLE, err => {
@@ -183,14 +199,15 @@ export default class GraphQLFactoryACLPlugin {
     definition.registerPlugin('types')
 
     // add the acl middleware
-    definition.beforeResolve(function (args, next) {
+    definition.beforeResolve(function (resolverArgs, next) {
       try {
         const GraphQLError = this.graphql.GraphQLError
-        let { info, context } = args
+        let { args, info } = resolverArgs
+        let op = _.get(info, 'operation.operation')
         let secret = _.get(_this.options, 'secret')
         let userIdField = _.get(_this.options, 'userIdField', 'userId')
         let schemaName = info.schema._factory.key
-        let basePath = `${schemaName}.${info.fieldName}`
+        let basePath = `${schemaName}.${op}.${info.fieldName}`
 
         // if not marked as an ACL continue to the next middleware
         if (!this.fieldDef || !this.fieldDef._factoryACL) return next()
@@ -210,18 +227,43 @@ export default class GraphQLFactoryACLPlugin {
           let userId = _.get(decoded, userIdField)
           if (!userId) return next(new Error('ACLError: No userId found in the provided jwt'))
 
-          return acl.allowedPermissions(userId, buildResources(info, schemaName), (err, list) => {
+          const resources = buildResources(info, args, schemaName)
+
+          return acl.allowedPermissions(userId, resources, (err, list) => {
             if (err) return next(err)
+
+            console.log(list)
+
+            // check for all access
+            if (_.intersection(_.get(list, '*', []), requiredPerms).length) {
+              return next()
+            }
 
             // check that there are some permissions, if not then the userid has no access
             if (!Object.keys(_.pickBy(list, perm => perm.length > 0)).length) {
-              return next(new Error(`User "${userId}" is not authorized on "${basePath}"`))
+              return next(new Error(`User "${userId}" has no permissions on "${basePath}"`))
             }
 
+            // get cumulative base permissions for query an args
+            const baseQueryPerms = _.reduce([schemaName, op, info.fieldName, 'query'], (accum, cur) => {
+              accum.path.push(cur)
+              accum.perms = _.union(accum.perms, _.get(list, accum.path.concat('*').join('.'), []))
+              return accum
+            }, { path: [], perms: [] }).perms
+            const baseArgsPerms = _.reduce([schemaName, op, info.fieldName, 'args'], (accum, cur) => {
+              accum.path.push(cur)
+              accum.perms = _.union(accum.perms, _.get(list, accum.path.concat('*').join('.'), []))
+              return accum
+            }, { path: [], perms: [] }).perms
+
             // check for the * resource and permission, if found then authorize
-            if (_.intersection(_.get(list, `["${basePath}.*"]`, []), requiredPerms).length) {
-              return next()
+            if (_.intersection(baseQueryPerms, requiredPerms).length) {
+              if (!_.keys(args).length || _.intersection(baseArgsPerms, requiredPerms).length) {
+                return next()
+              }
             }
+
+            // TODO: re-work the keep and error evauluators to handle the new path structure and not cases
 
             // build an object that represents the fields to keep
             let keep = buildKeepObject(info, list, requiredPerms, basePath)

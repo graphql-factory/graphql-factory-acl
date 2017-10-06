@@ -188,7 +188,7 @@ export default function schemas (plugin) {
                 })
               })
             },
-            _factoryACL: 'update'
+           // _factoryACL: 'update'
           },
           removeAllow: {
             type: 'JSON',
@@ -204,7 +204,7 @@ export default function schemas (plugin) {
                 })
               })
             },
-            _factoryACL: 'update'
+            //_factoryACL: 'update'
           },
           removeResource: {
             type: 'JSON',
