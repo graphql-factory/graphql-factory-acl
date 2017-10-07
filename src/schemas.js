@@ -1,7 +1,8 @@
+import _ from 'lodash'
 const USER_ROLE = 'user'
 
 export default function schemas (plugin) {
-  let { schemaName, acl } = plugin
+  const { schemaName, acl } = plugin
 
   return {
     [schemaName]: {
@@ -14,6 +15,7 @@ export default function schemas (plugin) {
               resources: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.allowedPermissions(args.userId, args.resources, (err, obj) => {
                   return err ? reject(err) : resolve(obj)
@@ -30,8 +32,10 @@ export default function schemas (plugin) {
               permissions: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
+              const { roles, resource, permissions } = args
               return new Promise((resolve, reject) => {
-                return acl.areAnyRolesAllowed(args.roles, args.resource, args.permissions, (err, allowed) => {
+                return acl.areAnyRolesAllowed(roles, resource, permissions, (err, allowed) => {
                   return err ? reject(err) : resolve(allowed)
                 })
               })
@@ -46,8 +50,10 @@ export default function schemas (plugin) {
               permissions: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
+              const { userId, resource, permissions } = args
               return new Promise((resolve, reject) => {
-                return acl.isAllowed(args.userId, args.resource, args.permissions, (err, allowed) => {
+                return acl.isAllowed(userId, resource, permissions, (err, allowed) => {
                   return err ? reject(err) : resolve(allowed)
                 })
               })
@@ -57,6 +63,7 @@ export default function schemas (plugin) {
           listUsers: {
             type: 'JSON',
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.roleUsers(USER_ROLE, (err, users) => {
                   return err ? reject(err) : resolve(users)
@@ -71,6 +78,7 @@ export default function schemas (plugin) {
               userId: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.userRoles(args.userId, (err, roles) => {
                   return err ? reject(err) : resolve(roles)
@@ -85,6 +93,7 @@ export default function schemas (plugin) {
               rolename: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.roleUsers(args.rolename, (err, users) => {
                   return err ? reject(err) : resolve(users)
@@ -100,6 +109,7 @@ export default function schemas (plugin) {
               rolename: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.hasRole(args.userId, args.rolename, (err, hasRole) => {
                   return err ? reject(err) : resolve(hasRole)
@@ -115,6 +125,7 @@ export default function schemas (plugin) {
               permissions: { type: 'JSON' }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 if (args.permissions) {
                   return acl.whatResources(args.role, args.permissions, (err, obj) => {
@@ -139,6 +150,7 @@ export default function schemas (plugin) {
               parents: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.addRoleParents(args.role, args.parents, err => {
                   return err ? reject(err) : resolve(null)
@@ -154,10 +166,11 @@ export default function schemas (plugin) {
               roles: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 // always add user to its own role and user. this is a hack/workaround to
                 // apply permissions on a user level as well as to list/add users
-                let roles = args.roles.concat([args.userId, USER_ROLE])
+                const roles = args.roles.concat([ args.userId, USER_ROLE ])
                 return acl.addUserRoles(args.userId, roles, err => {
                   return err ? reject(err) : resolve(null)
                 })
@@ -171,9 +184,10 @@ export default function schemas (plugin) {
               roles: { type: 'JSON' },
               resources: { type: 'JSON' },
               permissions: { type: 'JSON' },
-              permissionsArray: { type: ['JSON'] }
+              permissionsArray: { type: [ 'JSON' ] }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 if (args.permissionsArray) {
                   return acl.allow(args.permissionsArray, err => {
@@ -188,7 +202,7 @@ export default function schemas (plugin) {
                 })
               })
             },
-           // _factoryACL: 'update'
+           _factoryACL: 'update'
           },
           removeAllow: {
             type: 'JSON',
@@ -198,13 +212,14 @@ export default function schemas (plugin) {
               permissions: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.removeAllow(args.roles, args.resources, args.permissions, err => {
                   return err ? reject(err) : resolve(null)
                 })
               })
             },
-            //_factoryACL: 'update'
+            _factoryACL: 'update'
           },
           removeResource: {
             type: 'JSON',
@@ -212,6 +227,7 @@ export default function schemas (plugin) {
               resource: { type: 'String', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.removeResource(args.resource, err => {
                   return err ? reject(err) : resolve(null)
@@ -226,6 +242,7 @@ export default function schemas (plugin) {
               role: { type: 'String', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.removeRole(args.role, err => {
                   return err ? reject(err) : resolve(null)
@@ -241,6 +258,7 @@ export default function schemas (plugin) {
               parents: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 return acl.removeRoleParents(args.role, args.parents, err => {
                   return err ? reject(err) : resolve(null)
@@ -256,9 +274,12 @@ export default function schemas (plugin) {
               roles: { type: 'JSON', nullable: false }
             },
             resolve (source, args, context, info) {
+              _.noop(source, context, info)
               return new Promise((resolve, reject) => {
                 // filter out the user and self role
-                let roles = args.roles.filter(role => [args.userId, USER_ROLE].indexOf(role) === -1)
+                const roles = args.roles.filter(role => {
+                  return [ args.userId, USER_ROLE ].indexOf(role) === -1
+                })
                 return acl.removeUserRoles(args.userId, roles, err => {
                   return err ? reject(err) : resolve(null)
                 })
