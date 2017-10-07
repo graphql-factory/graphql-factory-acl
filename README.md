@@ -1,5 +1,8 @@
 # graphql-factory-acl
-ACL Middleware for GraphQL Factory
+ACL Middleware/plugin for GraphQL Factory
+
+## About
+
 
 Adding permissions
 

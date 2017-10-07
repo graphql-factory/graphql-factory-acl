@@ -521,19 +521,22 @@ var GraphQLFactoryACLPlugin = function () {
 
           // check that the secret is in the correct format
           if (!_.isString(secret) && !(secret instanceof Buffer)) {
-            return next(new Error('ACLError: The secret provided ' + 'by the application is incorrectly formatted'));
+            // log a warning to the factory
+            var secretErr = new Error('ACLError: The secret provided ' + 'by the application is incorrectly formatted, ' + 'please contact your system admin');
+            definition.log('warn', 'acl-plugin', secretErr.message);
+            return next(secretErr);
           }
 
           // check for jwt in the rootValue
           var token = _.get(info, 'rootValue.jwt');
           if (!token || !_.isString(token)) {
-            return next(new Error('ACLError: No jwt was provided in the rootValue of the request'));
+            return next(new Error('No jwt was provided in the rootValue ' + 'of the request (rootValue.jwt)'));
           }
 
           return jwt.verify(token, secret, function (jwtErr, decoded) {
             if (jwtErr) return next(jwtErr);
             var userId = _.get(decoded, userIdField);
-            if (!userId) return next(new Error('ACLError: No userId found in the provided jwt'));
+            if (!userId) return next(new Error('No userId found in the provided jwt'));
 
             var resources = buildResources(info, args, schemaName);
             var reqPaths = createRequestPaths(info, args, basePath);
