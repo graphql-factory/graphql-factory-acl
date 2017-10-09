@@ -179,5 +179,17 @@ provided to add complete access to the ACL schema.
 
 The plugin provides a complete graphql api for the `acl` library and
 adds additional shortcut/helper methods for managing permissions on
-graphql resources.
+graphql resources. The original [`acl documentation`](https://github.com/optimalbits/node_acl)
+is a good place to start for understanding the `acl` API.
+
+Please refer to the [`ACL Schema Definition`](https://github.com/graphql-factory/graphql-factory-acl/blob/master/src/schemas.js)
+for included query/mutations. Additional operations added are
+
+* queries
+  * `listUsers` - provides a list of users
+* mutations
+  * `allowUserId` - same as `allow` except allows a specific `userId`
+  * `removeAllowUserId` - same as `removeAllow` except it removes permissions for a specific `userId`
+  * `allowGraphQL` - constructs a `graphql` resource path and allows access to it
+  * `removeAllowGraphQL` - constructs a `graphql` resource path and removes access to it
 

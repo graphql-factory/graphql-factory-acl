@@ -52,7 +52,7 @@
     "express": "^4.16.1",
     "express-graphql": "^0.6.11",
     "graphql": "^0.11.6",
-    "graphql-factory": "git+https://github.com/graphql-factory/graphql-factory.git#development",
+    "graphql-factory": "^2.1.0",
     "mocha": "^3.5.3",
     "rethinkdbdash": "^2.3.31",
     "rollup": "^0.50.0",

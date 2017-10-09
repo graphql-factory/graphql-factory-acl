@@ -1,8 +1,8 @@
 import _ from 'lodash'
 import jwt from 'jsonwebtoken'
-import schemaDef from './schemas'
-
-const ADMIN_ROLE = 'admin'
+import schemasDef from './schemas'
+import typesDef from './types'
+import { ADMIN_ROLE, SYSTEM_PREFIX, USER_ROLE } from './const'
 
 /**
  * Creates a list of resource paths the user is requesting access to
@@ -107,7 +107,7 @@ function createRequestPaths (info, args, basePath) {
  */
 export default class GraphQLFactoryACLPlugin {
   constructor (acl, options) {
-    const opts = typeof options === 'object'
+    const opts = _.isObject(options)
       ? options
       : {}
     this.schemaName = _.isString(opts.schemaName) && opts.schemaName
@@ -118,12 +118,19 @@ export default class GraphQLFactoryACLPlugin {
     this.acl = acl
   }
 
-  createAdmin () {
-    const adminId = _.get(this.options, 'adminId', 'admin@localhost')
+  createAdmin (adminId) {
+    const _adminId = _.isString(adminId) && adminId
+      ? adminId
+      : 'admin@localhost'
     const resources = `${this.schemaName}.*`
+    const roles = [
+      ADMIN_ROLE,
+      USER_ROLE,
+      `${SYSTEM_PREFIX}.${adminId}`
+    ]
     return new Promise((resolve, reject) => {
       try {
-        return this.acl.addUserRoles(adminId, ADMIN_ROLE, err => {
+        return this.acl.addUserRoles(_adminId, roles, err => {
           if (err) return reject(err)
           return this.acl.allow(ADMIN_ROLE, resources, '*', allowErr => {
             return allowErr
@@ -151,11 +158,19 @@ export default class GraphQLFactoryACLPlugin {
   }
 
   /**
+   * Returns the types
+   * @returns {{}}
+   */
+  get types () {
+    return typesDef
+  }
+
+  /**
    * Returns a schema that acts as a graphql api for the ACL library.
    * @returns {{}}
    */
   get schemas () {
-    return schemaDef(this)
+    return schemasDef(this)
   }
 
   /**
@@ -172,22 +187,23 @@ export default class GraphQLFactoryACLPlugin {
     // add the acl middleware
     definition.beforeResolve(function (resolverArgs, next) {
       try {
+        const requiredPerm = _.get(this, 'fieldDef._factoryACL')
+        const secret = _.get(_this.options, 'secret')
+
+        // if no jwt secret has been provided authentication is disabled
+        // or if not marked as an ACL continue to the next middleware
+        if (!requiredPerm || !secret) return next()
+
+        // otherwise continue acl check
         const errors = []
         const GraphQLError = this.graphql.GraphQLError
         const { args, info } = resolverArgs
         const op = _.get(info, 'operation.operation')
-        const secret = _.get(_this.options, 'secret')
         const userIdField = _.get(_this.options, 'userIdField', 'userId')
         const schemaName = info.schema._factory.key
         const basePath = `${schemaName}.${op}.${info.fieldName}`
-
-        // if not marked as an ACL continue to the next middleware
-        if (!this.fieldDef || !this.fieldDef._factoryACL) return next()
-
-        const requiredPerms = [ this.fieldDef._factoryACL, '*' ]
-
-        // if no jwt secret has been provided authentication is disabled
-        if (!secret) return next()
+        const requiredPerms = [ requiredPerm, '*' ]
+        const token = _.get(info, 'rootValue.jwt')
 
         // check that the secret is in the correct format
         if (!_.isString(secret) && !(secret instanceof Buffer)) {
@@ -200,7 +216,6 @@ export default class GraphQLFactoryACLPlugin {
         }
 
         // check for jwt in the rootValue
-        const token = _.get(info, 'rootValue.jwt')
         if (!token || !_.isString(token)) {
           return next(new Error('No jwt was provided in the rootValue '
             + 'of the request (rootValue.jwt)'))

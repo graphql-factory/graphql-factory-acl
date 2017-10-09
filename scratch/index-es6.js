@@ -2,7 +2,7 @@ import _ from 'lodash'
 import * as graphql from 'graphql'
 import GraphQLFactory from '../../graphql-factory/src/index' // 'graphql-factory'
 import definition from './definition'
-import ACLPlugin from '../index' //'../src/index'
+import ACLPlugin from '../src/index' //'../src/index'
 import AccessControlList from 'acl'
 import RethinkDBACLBackend from 'acl-backend-rethinkdb'
 import rethinkdbdash from 'rethinkdbdash'
@@ -12,6 +12,7 @@ import Graphiql from 'express-graphql'
 import jwt from 'jsonwebtoken'
 
 const inmem = false
+const bypassAuth = true
 
 const secret = 'asdfjkl12345'
 
@@ -28,7 +29,7 @@ let rethinkBackend = new RethinkDBACLBackend(r, {
 
 let memoryBackend = new AccessControlList.memoryBackend()
 let acl = inmem ? new AccessControlList(memoryBackend) : new AccessControlList(rethinkBackend)
-let plugin = new ACLPlugin(acl, { secret })
+let plugin = new ACLPlugin(acl, bypassAuth ? {} : { secret })
 
 if (inmem) {
   plugin.createAdmin()

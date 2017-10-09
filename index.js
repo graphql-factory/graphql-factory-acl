@@ -5,9 +5,71 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 var _ = _interopDefault(require('lodash'));
 var jwt = _interopDefault(require('jsonwebtoken'));
 
+var ADMIN_ROLE = 'admin';
+var SYSTEM_PREFIX = '__system';
+var USER_ROLE = SYSTEM_PREFIX + '.user';
+
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-var USER_ROLE = 'user';
+/**
+ * Constructs a resource path or errors
+ * @param args
+ * @param cb
+ * @returns {*}
+ */
+function constructPath(args, cb) {
+  try {
+    var deny = args.deny,
+        schema = args.schema,
+        mutation = args.mutation,
+        query = args.query,
+        subscription = args.subscription,
+        arg = args.arg,
+        selection = args.selection;
+
+    var resourcePath = [schema];
+    var inherit = true;
+
+    // potentially add query, mutation, subscription
+    if (query) {
+      resourcePath.push('query');
+      resourcePath.push(query);
+    } else if (mutation) {
+      resourcePath.push('mutation');
+      resourcePath.push(mutation);
+    } else if (subscription) {
+      resourcePath.push('subscription');
+      resourcePath.push(subscription);
+    }
+
+    // potentially add args, selection
+    if (arg) {
+      if (resourcePath.length === 1) {
+        return cb(new Error('An arg path cannot be ' + 'specified without a query, mutation, or subscription'));
+      }
+      resourcePath.push('args');
+      resourcePath.push(arg);
+      inherit = false;
+    } else if (selection) {
+      if (resourcePath.length === 1) {
+        return cb(new Error('A selection path cannot be ' + 'specified without a query, mutation, or subscription'));
+      }
+      resourcePath.push('selection');
+      resourcePath.push(selection);
+      inherit = false;
+    }
+
+    // if the path is lower than an arg or selection
+    // its permissions are inherited
+    if (inherit) resourcePath.push('*');
+
+    // construct the resource
+    var resource = '' + (deny ? '!' : '') + resourcePath.join('.');
+    return cb(undefined, resource);
+  } catch (err) {
+    return cb(err);
+  }
+}
 
 function schemas(plugin) {
   var schemaName = plugin.schemaName,
@@ -19,14 +81,18 @@ function schemas(plugin) {
       fields: {
         allowedPermissions: {
           type: 'JSON',
+          description: 'Returns all the allowable permissions ' + 'a given user have to access the given resources.',
           args: {
-            userId: { type: 'JSON', nullable: false },
-            resources: { type: 'JSON', nullable: false }
+            userId: { type: 'String', nullable: false },
+            resources: { type: ['String'] }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var userId = args.userId,
+                resources = args.resources;
+
             return new Promise(function (resolve, reject) {
-              return acl.allowedPermissions(args.userId, args.resources, function (err, obj) {
+              return acl.allowedPermissions(userId, resources, function (err, obj) {
                 return err ? reject(err) : resolve(obj);
               });
             });
@@ -35,11 +101,12 @@ function schemas(plugin) {
           _factoryACL: 'read'
         },
         areAnyRolesAllowed: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Returns true if any of the given ' + 'roles have the right permissions.',
           args: {
-            roles: { type: 'JSON', nullable: false },
+            roles: { type: ['String'], nullable: false },
             resource: { type: 'String', nullable: false },
-            permissions: { type: 'JSON', nullable: false }
+            permissions: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
@@ -58,10 +125,11 @@ function schemas(plugin) {
         },
         isAllowed: {
           type: 'Boolean',
+          description: 'Checks if the given user is allowed to access ' + 'the resource for the given permissions (note: it must fulfill ' + 'all the permissions).',
           args: {
-            userId: { type: 'JSON', nullable: false },
+            userId: { type: 'String', nullable: false },
             resource: { type: 'String', nullable: false },
-            permissions: { type: 'JSON', nullable: false }
+            permissions: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
@@ -79,9 +147,9 @@ function schemas(plugin) {
           _factoryACL: 'read'
         },
         listUsers: {
-          type: 'JSON',
-          resolve: function resolve(source, args, context, info) {
-            _.noop(source, context, info);
+          type: ['String'],
+          description: 'Returns a list of all users currently assigned permissions',
+          resolve: function resolve() {
             return new Promise(function (resolve, reject) {
               return acl.roleUsers(USER_ROLE, function (err, users) {
                 return err ? reject(err) : resolve(users);
@@ -92,14 +160,17 @@ function schemas(plugin) {
           _factoryACL: 'read'
         },
         userRoles: {
-          type: 'JSON',
+          type: ['String'],
+          description: 'Return all the roles from a given user.',
           args: {
-            userId: { type: 'JSON', nullable: false }
+            userId: { type: 'String', nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var userId = args.userId;
+
             return new Promise(function (resolve, reject) {
-              return acl.userRoles(args.userId, function (err, roles) {
+              return acl.userRoles(userId, function (err, roles) {
                 return err ? reject(err) : resolve(roles);
               });
             });
@@ -108,14 +179,17 @@ function schemas(plugin) {
           _factoryACL: 'read'
         },
         roleUsers: {
-          type: 'JSON',
+          type: ['String'],
+          description: 'Return all users who has a given role.',
           args: {
-            rolename: { type: 'JSON', nullable: false }
+            role: { type: 'String', nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var role = args.role;
+
             return new Promise(function (resolve, reject) {
-              return acl.roleUsers(args.rolename, function (err, users) {
+              return acl.roleUsers(role, function (err, users) {
                 return err ? reject(err) : resolve(users);
               });
             });
@@ -125,14 +199,18 @@ function schemas(plugin) {
         },
         hasRole: {
           type: 'Boolean',
+          description: 'Return boolean whether user has the role.',
           args: {
-            userId: { type: 'JSON', nullable: false },
-            rolename: { type: 'JSON', nullable: false }
+            userId: { type: 'String', nullable: false },
+            role: { type: 'String', nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var userId = args.userId,
+                role = args.role;
+
             return new Promise(function (resolve, reject) {
-              return acl.hasRole(args.userId, args.rolename, function (err, hasRole) {
+              return acl.hasRole(userId, role, function (err, hasRole) {
                 return err ? reject(err) : resolve(hasRole);
               });
             });
@@ -142,19 +220,23 @@ function schemas(plugin) {
         },
         whatResources: {
           type: 'JSON',
+          description: 'Returns what resources a given role has permissions over.',
           args: {
-            role: { type: 'JSON', nullable: false },
-            permissions: { type: 'JSON' }
+            roles: { type: ['String'], nullable: false },
+            permissions: { type: ['String'] }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var roles = args.roles,
+                permissions = args.permissions;
+
             return new Promise(function (resolve, reject) {
-              if (args.permissions) {
-                return acl.whatResources(args.role, args.permissions, function (err, obj) {
+              if (permissions) {
+                return acl.whatResources(roles, permissions, function (err, obj) {
                   return err ? reject(err) : resolve(obj);
                 });
               }
-              return acl.whatResources(args.role, function (err, obj) {
+              return acl.whatResources(roles, function (err, obj) {
                 return err ? reject(err) : resolve(obj);
               });
             });
@@ -167,16 +249,20 @@ function schemas(plugin) {
     mutation: {
       fields: {
         addRoleParents: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Adds a parent or parent list to role.',
           args: {
-            role: { type: 'JSON', nullable: false },
-            parents: { type: 'JSON', nullable: false }
+            role: { type: 'String', nullable: false },
+            parents: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var role = args.role,
+                parents = args.parents;
+
             return new Promise(function (resolve, reject) {
-              return acl.addRoleParents(args.role, args.parents, function (err) {
-                return err ? reject(err) : resolve(null);
+              return acl.addRoleParents(role, parents, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -184,19 +270,23 @@ function schemas(plugin) {
           _factoryACL: 'update'
         },
         addUserRoles: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Adds roles to a given user id.',
           args: {
-            userId: { type: 'JSON', nullable: false },
-            roles: { type: 'JSON', nullable: false }
+            userId: { type: 'String', nullable: false },
+            roles: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var userId = args.userId,
+                roles = args.roles;
+
             return new Promise(function (resolve, reject) {
               // always add user to its own role and user. this is a hack/workaround to
               // apply permissions on a user level as well as to list/add users
-              var roles = args.roles.concat([args.userId, USER_ROLE]);
-              return acl.addUserRoles(args.userId, roles, function (err) {
-                return err ? reject(err) : resolve(null);
+              var _roles = _.union(roles, [SYSTEM_PREFIX + '.' + userId, USER_ROLE]);
+              return acl.addUserRoles(userId, _roles, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -204,26 +294,57 @@ function schemas(plugin) {
           _factoryACL: 'update'
         },
         allow: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Adds the given permissions to the ' + 'given roles over the given resources.',
           args: {
-            roles: { type: 'JSON' },
-            resources: { type: 'JSON' },
-            permissions: { type: 'JSON' },
-            permissionsArray: { type: ['JSON'] }
+            roles: { type: ['String'] },
+            resources: { type: ['String'] },
+            permissions: { type: ['String'] },
+            permissionsArray: { type: ['PermissionItemInput'] }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var roles = args.roles,
+                resources = args.resources,
+                permissions = args.permissions,
+                permissionsArray = args.permissionsArray;
+
+            var GraphQLError = _.get(this, 'graphql.GraphQLError', Error);
             return new Promise(function (resolve, reject) {
-              if (args.permissionsArray) {
-                return acl.allow(args.permissionsArray, function (err) {
-                  return err ? reject(err) : resolve(null);
+              if (permissionsArray) {
+                return acl.allow(permissionsArray, function (err) {
+                  return err ? reject(err) : resolve(true);
                 });
-              } else if (!args.roles || !args.resources || !args.permissions) {
-                return reject(new Error('roles, resources, and permissions are required'));
+              } else if (!roles || !resources || !permissions) {
+                return reject(new GraphQLError('roles, resources, ' + 'and permissions are required'));
               }
 
-              return acl.allow(args.roles, args.resources, args.permissions, function (err) {
-                return err ? reject(err) : resolve(null);
+              return acl.allow(roles, resources, permissions, function (err) {
+                return err ? reject(err) : resolve(true);
+              });
+            });
+          },
+
+          _factoryACL: 'update'
+        },
+        allowUserId: {
+          type: 'Boolean',
+          description: 'Allows a specific userId permissions to the ' + 'given roles using the user\'s system generated role',
+          args: {
+            userId: { type: 'String', nullable: false },
+            resources: { type: ['String'], nullable: false },
+            permissions: { type: ['String'], nullable: false }
+          },
+          resolve: function resolve(source, args, context, info) {
+            _.noop(source, context, info);
+            var userId = args.userId,
+                resources = args.resources,
+                permissions = args.permissions;
+
+            var roles = SYSTEM_PREFIX + '.' + userId;
+            return new Promise(function (resolve, reject) {
+              return acl.allow(roles, resources, permissions, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -231,17 +352,50 @@ function schemas(plugin) {
           _factoryACL: 'update'
         },
         removeAllow: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Remove permissions from the given ' + 'resources owned by the given role.',
           args: {
             role: { type: 'String', nullable: false },
-            resources: { type: 'JSON', nullable: false },
-            permissions: { type: 'JSON', nullable: false }
+            resources: { type: ['String'], nullable: false },
+            permissions: { type: ['String'] }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var role = args.role,
+                resources = args.resources,
+                permissions = args.permissions;
+
             return new Promise(function (resolve, reject) {
-              return acl.removeAllow(args.roles, args.resources, args.permissions, function (err) {
-                return err ? reject(err) : resolve(null);
+              return permissions ? acl.removeAllow(role, resources, permissions, function (err) {
+                return err ? reject(err) : resolve(true);
+              }) : acl.removeAllow(role, resources, function (err) {
+                return err ? reject(err) : resolve(true);
+              });
+            });
+          },
+
+          _factoryACL: 'update'
+        },
+        removeAllowUserId: {
+          type: 'Boolean',
+          description: 'Remove permissions from the given ' + 'resources owned by the given userId.',
+          args: {
+            userId: { type: 'String', nullable: false },
+            resources: { type: ['String'], nullable: false },
+            permissions: { type: ['String'] }
+          },
+          resolve: function resolve(source, args, context, info) {
+            _.noop(source, context, info);
+            var userId = args.userId,
+                resources = args.resources,
+                permissions = args.permissions;
+
+            var role = SYSTEM_PREFIX + '.' + userId;
+            return new Promise(function (resolve, reject) {
+              return permissions ? acl.removeAllow(role, resources, permissions, function (err) {
+                return err ? reject(err) : resolve(true);
+              }) : acl.removeAllow(role, resources, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -249,15 +403,18 @@ function schemas(plugin) {
           _factoryACL: 'update'
         },
         removeResource: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Removes a resource from the system.',
           args: {
             resource: { type: 'String', nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var resource = args.resource;
+
             return new Promise(function (resolve, reject) {
-              return acl.removeResource(args.resource, function (err) {
-                return err ? reject(err) : resolve(null);
+              return acl.removeResource(resource, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -265,15 +422,21 @@ function schemas(plugin) {
           _factoryACL: 'delete'
         },
         removeRole: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Removes a role from the system.',
           args: {
             role: { type: 'String', nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var role = args.role;
+
             return new Promise(function (resolve, reject) {
-              return acl.removeRole(args.role, function (err) {
-                return err ? reject(err) : resolve(null);
+              if (role.match(new RegExp('^' + SYSTEM_PREFIX + '.'))) {
+                return reject(new Error('Cannot remove system role ' + role));
+              }
+              return acl.removeRole(role, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -281,16 +444,20 @@ function schemas(plugin) {
           _factoryACL: 'delete'
         },
         removeRoleParents: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Removes a parent or parent list from role. ' + 'If parents is not specified, removes all parents.',
           args: {
             role: { type: 'String', nullable: false },
-            parents: { type: 'JSON', nullable: false }
+            parents: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var role = args.role,
+                parents = args.parents;
+
             return new Promise(function (resolve, reject) {
-              return acl.removeRoleParents(args.role, args.parents, function (err) {
-                return err ? reject(err) : resolve(null);
+              return acl.removeRoleParents(role, parents, function (err) {
+                return err ? reject(err) : resolve(true);
               });
             });
           },
@@ -298,20 +465,165 @@ function schemas(plugin) {
           _factoryACL: 'update'
         },
         removeUserRoles: {
-          type: 'JSON',
+          type: 'Boolean',
+          description: 'Remove roles from a given user.',
           args: {
-            userId: { type: 'JSON', nullable: false },
-            roles: { type: 'JSON', nullable: false }
+            userId: { type: 'String', nullable: false },
+            roles: { type: ['String'], nullable: false }
           },
           resolve: function resolve(source, args, context, info) {
             _.noop(source, context, info);
+            var userId = args.userId,
+                roles = args.roles;
+
             return new Promise(function (resolve, reject) {
               // filter out the user and self role
-              var roles = args.roles.filter(function (role) {
-                return [args.userId, USER_ROLE].indexOf(role) === -1;
+              var _roles = roles.filter(function (role) {
+                return [SYSTEM_PREFIX + '.' + userId, USER_ROLE].indexOf(role) === -1;
               });
-              return acl.removeUserRoles(args.userId, roles, function (err) {
-                return err ? reject(err) : resolve(null);
+              return acl.removeUserRoles(userId, _roles, function (err) {
+                return err ? reject(err) : resolve(true);
+              });
+            });
+          },
+
+          _factoryACL: 'update'
+        },
+        allowGraphQL: {
+          type: 'JSON',
+          description: 'Allows access to GraphQL.',
+          args: {
+            roles: {
+              type: ['String'],
+              nullable: false,
+              description: 'Roles to add permissions for.'
+            },
+            permissions: {
+              type: ['String'],
+              defaultValue: ['*'],
+              description: 'Permissions to add.'
+            },
+            deny: {
+              type: 'Boolean',
+              defaultValue: false,
+              description: 'Add the permission as an explicit deny.'
+            },
+            schema: {
+              type: 'String',
+              nullable: false,
+              description: 'The schema to add the permission on.'
+            },
+            mutation: {
+              type: 'String',
+              description: 'Name of the mutation field to add a permission on.'
+            },
+            query: {
+              type: 'String',
+              description: 'Name of the query field to add a permission on.'
+            },
+            subscription: {
+              type: 'String',
+              description: 'Name of the subscription field to add a permission on.'
+            },
+            arg: {
+              type: 'String',
+              description: 'Name of the argument field to add a permission on.'
+            },
+            selection: {
+              type: 'String',
+              description: 'Name of the selection field to add a permission on.'
+            }
+          },
+          resolve: function resolve(source, args, context, info) {
+            _.noop(source, context, info);
+            var roles = args.roles,
+                permissions = args.permissions;
+
+
+            return new Promise(function (resolve, reject) {
+              return constructPath(args, function (pathErr, resource) {
+                if (pathErr) return reject(pathErr);
+                var output = {
+                  allowed: {
+                    resource: resource,
+                    roles: roles,
+                    permissions: permissions
+                  }
+                };
+                return acl.allow(roles, resource, permissions, function (err) {
+                  return err ? reject(err) : resolve(output);
+                });
+              });
+            });
+          },
+
+          _factoryACL: 'update'
+        },
+        removeAllowGraphQL: {
+          type: 'JSON',
+          description: 'Removes access to GraphQL.',
+          args: {
+            role: {
+              type: 'String',
+              nullable: false,
+              description: 'Role to remove permissions for.'
+            },
+            permissions: {
+              type: ['String'],
+              description: 'Permissions to remove.'
+            },
+            deny: {
+              type: 'Boolean',
+              defaultValue: false,
+              description: 'Permission to remove is an explicit deny.'
+            },
+            schema: {
+              type: 'String',
+              nullable: false,
+              description: 'The schema to remove the permission on.'
+            },
+            mutation: {
+              type: 'String',
+              description: 'Name of the mutation field to remove a permission on.'
+            },
+            query: {
+              type: 'String',
+              description: 'Name of the query field to remove a permission on.'
+            },
+            subscription: {
+              type: 'String',
+              description: 'Name of the subscription field to remove a permission on.'
+            },
+            arg: {
+              type: 'String',
+              description: 'Name of the argument field to remove a permission on.'
+            },
+            selection: {
+              type: 'String',
+              description: 'Name of the selection field to remove a permission on.'
+            }
+          },
+          resolve: function resolve(source, args, context, info) {
+            _.noop(source, context, info);
+            var role = args.role,
+                permissions = args.permissions;
+
+
+            return new Promise(function (resolve, reject) {
+              return constructPath(args, function (pathErr, resource) {
+                if (pathErr) return reject(pathErr);
+                var output = {
+                  removed: {
+                    resource: resource,
+                    role: role,
+                    permissions: permissions
+                  }
+                };
+                return permissions ? acl.removeAllow(role, resource, permissions, function (err) {
+                  return err ? reject(err) : resolve(output);
+                }) : acl.removeAllow(role, resource, function (err) {
+                  return err ? reject(err) : resolve(output);
+                });
               });
             });
           },
@@ -323,15 +635,30 @@ function schemas(plugin) {
   });
 }
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+var typesDef = {
+  AllowItemInput: {
+    type: 'Input',
+    fields: {
+      resources: ['String'],
+      permissions: ['String']
+    },
+    description: 'ACL permissions array allows array item'
+  },
+  PermissionItemInput: {
+    type: 'Input',
+    fields: {
+      roles: ['String'],
+      allows: ['AllowItemInput']
+    },
+    description: 'ACL permissions array item'
+  }
+};
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
-var ADMIN_ROLE = 'admin';
 
 /**
  * Creates a list of resource paths the user is requesting access to
@@ -439,7 +766,7 @@ var GraphQLFactoryACLPlugin = function () {
   function GraphQLFactoryACLPlugin(acl, options) {
     _classCallCheck(this, GraphQLFactoryACLPlugin);
 
-    var opts = (typeof options === 'undefined' ? 'undefined' : _typeof(options)) === 'object' ? options : {};
+    var opts = _.isObject(options) ? options : {};
     this.schemaName = _.isString(opts.schemaName) && opts.schemaName ? opts.schemaName : 'ACL';
 
     this.options = opts;
@@ -448,14 +775,15 @@ var GraphQLFactoryACLPlugin = function () {
 
   _createClass(GraphQLFactoryACLPlugin, [{
     key: 'createAdmin',
-    value: function createAdmin() {
+    value: function createAdmin(adminId) {
       var _this2 = this;
 
-      var adminId = _.get(this.options, 'adminId', 'admin@localhost');
+      var _adminId = _.isString(adminId) && adminId ? adminId : 'admin@localhost';
       var resources = this.schemaName + '.*';
+      var roles = [ADMIN_ROLE, USER_ROLE, SYSTEM_PREFIX + '.' + adminId];
       return new Promise(function (resolve, reject) {
         try {
-          return _this2.acl.addUserRoles(adminId, ADMIN_ROLE, function (err) {
+          return _this2.acl.addUserRoles(_adminId, roles, function (err) {
             if (err) return reject(err);
             return _this2.acl.allow(ADMIN_ROLE, resources, '*', function (allowErr) {
               return allowErr ? reject(allowErr) : resolve({
@@ -478,7 +806,7 @@ var GraphQLFactoryACLPlugin = function () {
     }
 
     /**
-     * Returns a schema that acts as a graphql api for the ACL library.
+     * Returns the types
      * @returns {{}}
      */
 
@@ -500,24 +828,25 @@ var GraphQLFactoryACLPlugin = function () {
       // add the acl middleware
       definition.beforeResolve(function (resolverArgs, next) {
         try {
+          var requiredPerm = _.get(this, 'fieldDef._factoryACL');
+          var secret = _.get(_this.options, 'secret');
+
+          // if no jwt secret has been provided authentication is disabled
+          // or if not marked as an ACL continue to the next middleware
+          if (!requiredPerm || !secret) return next();
+
+          // otherwise continue acl check
           var errors = [];
           var GraphQLError = this.graphql.GraphQLError;
           var args = resolverArgs.args,
               info = resolverArgs.info;
 
           var op = _.get(info, 'operation.operation');
-          var secret = _.get(_this.options, 'secret');
           var userIdField = _.get(_this.options, 'userIdField', 'userId');
           var schemaName = info.schema._factory.key;
           var basePath = schemaName + '.' + op + '.' + info.fieldName;
-
-          // if not marked as an ACL continue to the next middleware
-          if (!this.fieldDef || !this.fieldDef._factoryACL) return next();
-
-          var requiredPerms = [this.fieldDef._factoryACL, '*'];
-
-          // if no jwt secret has been provided authentication is disabled
-          if (!secret) return next();
+          var requiredPerms = [requiredPerm, '*'];
+          var token = _.get(info, 'rootValue.jwt');
 
           // check that the secret is in the correct format
           if (!_.isString(secret) && !(secret instanceof Buffer)) {
@@ -528,7 +857,6 @@ var GraphQLFactoryACLPlugin = function () {
           }
 
           // check for jwt in the rootValue
-          var token = _.get(info, 'rootValue.jwt');
           if (!token || !_.isString(token)) {
             return next(new Error('No jwt was provided in the rootValue ' + 'of the request (rootValue.jwt)'));
           }
@@ -585,6 +913,17 @@ var GraphQLFactoryACLPlugin = function () {
         }
       });
     }
+  }, {
+    key: 'types',
+    get: function get() {
+      return typesDef;
+    }
+
+    /**
+     * Returns a schema that acts as a graphql api for the ACL library.
+     * @returns {{}}
+     */
+
   }, {
     key: 'schemas',
     get: function get() {
