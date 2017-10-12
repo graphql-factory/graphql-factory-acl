@@ -1,6 +1,6 @@
 {
   "name": "graphql-factory-acl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ACL Middleware for GraphQL Factory",
   "main": "index.js",
   "scripts": {

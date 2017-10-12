@@ -769,6 +769,8 @@ var GraphQLFactoryACLPlugin = function () {
     var opts = _.isObject(options) ? options : {};
     this.schemaName = _.isString(opts.schemaName) && opts.schemaName ? opts.schemaName : 'ACL';
 
+    this.systemUserId = _.isString(opts.systemUserId) && opts.systemUserId ? opts.systemUserId : undefined;
+
     this.options = opts;
     this.acl = acl;
   }
@@ -827,6 +829,8 @@ var GraphQLFactoryACLPlugin = function () {
 
       // add the acl middleware
       definition.beforeResolve(function (resolverArgs, next) {
+        var _this3 = this;
+
         try {
           var requiredPerm = _.get(this, 'fieldDef._factoryACL');
           var secret = _.get(_this.options, 'secret');
@@ -866,9 +870,14 @@ var GraphQLFactoryACLPlugin = function () {
             var userId = _.get(decoded, userIdField);
             if (!userId) return next(new Error('No userId found in the provided jwt'));
 
+            // check for system user
+            if (_this3.systemUserId && userId === _this3.systemUserId) return next();
+
+            // otherwise build resource and request paths
             var resources = buildResources(info, args, schemaName);
             var reqPaths = createRequestPaths(info, args, basePath);
 
+            // get all permissions for the user on the current request
             return acl.allowedPermissions(userId, resources, function (aclErr, list) {
               if (aclErr) return next(aclErr);
 

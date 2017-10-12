@@ -114,6 +114,10 @@ export default class GraphQLFactoryACLPlugin {
       ? opts.schemaName
       : 'ACL'
 
+    this.systemUserId = _.isString(opts.systemUserId) && opts.systemUserId
+      ? opts.systemUserId
+      : undefined
+
     this.options = opts
     this.acl = acl
   }
@@ -226,9 +230,14 @@ export default class GraphQLFactoryACLPlugin {
           const userId = _.get(decoded, userIdField)
           if (!userId) return next(new Error('No userId found in the provided jwt'))
 
+          // check for system user
+          if (this.systemUserId && userId === this.systemUserId) return next()
+
+          // otherwise build resource and request paths
           const resources = buildResources(info, args, schemaName)
           const reqPaths = createRequestPaths(info, args, basePath)
 
+          // get all permissions for the user on the current request
           return acl.allowedPermissions(userId, resources, (aclErr, list) => {
             if (aclErr) return next(aclErr)
 

@@ -177,6 +177,22 @@ provided to add complete access to the ACL schema.
 
 ## API
 
+#### ACLPlugin (acl:Acl, options:Object)
+
+Creates a new acl plugin
+
+**Parameters**
+
+* `acl` - An acl instance initialized with a backend
+* `options`
+  * [`schemaName=ACL`] {`string`} - Customizable graphql schema name
+  * [`secret`] {`string`} - Secret to use when signing jsonwebtokens. If omitted no
+  acl rules will be evaluated (should only be omitted during dev or initial setup)
+  * [`systemUserId`] {`string`} - Optional userId that will not be checked against
+  acl rules and will have unrestricted access to all graphql schemas.
+
+## GraphQL API
+
 The plugin provides a complete graphql api for the `acl` library and
 adds additional shortcut/helper methods for managing permissions on
 graphql resources. The original [`acl documentation`](https://github.com/optimalbits/node_acl)
