@@ -231,7 +231,7 @@ export default class GraphQLFactoryACLPlugin {
           if (!userId) return next(new Error('No userId found in the provided jwt'))
 
           // check for system user
-          if (this.systemUserId && userId === this.systemUserId) return next()
+          if (_this.systemUserId && userId === _this.systemUserId) return next()
 
           // otherwise build resource and request paths
           const resources = buildResources(info, args, schemaName)

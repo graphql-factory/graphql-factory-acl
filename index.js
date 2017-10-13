@@ -829,8 +829,6 @@ var GraphQLFactoryACLPlugin = function () {
 
       // add the acl middleware
       definition.beforeResolve(function (resolverArgs, next) {
-        var _this3 = this;
-
         try {
           var requiredPerm = _.get(this, 'fieldDef._factoryACL');
           var secret = _.get(_this.options, 'secret');
@@ -871,7 +869,7 @@ var GraphQLFactoryACLPlugin = function () {
             if (!userId) return next(new Error('No userId found in the provided jwt'));
 
             // check for system user
-            if (_this3.systemUserId && userId === _this3.systemUserId) return next();
+            if (_this.systemUserId && userId === _this.systemUserId) return next();
 
             // otherwise build resource and request paths
             var resources = buildResources(info, args, schemaName);

@@ -2,7 +2,7 @@ build
 assets
 example
 node_modules
-scratch,
+scratch
 src
 test
 dist
@@ -14,3 +14,4 @@ npm-debug.log
 .travis.yml
 .*
 package-lock.json
+setup-project.sh
