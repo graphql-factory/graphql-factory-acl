@@ -198,6 +198,10 @@ export default class GraphQLFactoryACLPlugin {
         // or if not marked as an ACL continue to the next middleware
         if (!requiredPerm || !secret) return next()
 
+        // check for system api key
+        const apikey = _.get(info, 'rootValue.apikey')
+        if (apikey && _this.options.systemApiKey === apikey) return next()
+
         // otherwise continue acl check
         const errors = []
         const GraphQLError = this.graphql.GraphQLError

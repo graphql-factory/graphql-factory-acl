@@ -145,6 +145,11 @@ JSON Web Tokens (`jwt`) are used for authorization. When setting up the plugin
 a secret option can be supplied and will be used during verification of
 any `jwt` provided in the `rootValue.jwt` property of the graphql request.
 
+Additionally a `systemApiKey` option can be set and provided in `rootValue.apikey`
+in order to give unrestricted access. This can be useful for operations like
+subscriptions that run for extended periods of time and could potentially encounter
+and expired `jwt`. Or event for server side scheduled tasks that require calls to the
+`graphql` api.
 
 #### JWT
 
@@ -190,6 +195,8 @@ Creates a new acl plugin
   acl rules will be evaluated (should only be omitted during dev or initial setup)
   * [`systemUserId`] {`string`} - Optional userId that will not be checked against
   acl rules and will have unrestricted access to all graphql schemas.
+  * [`systemApiKey`] { `string` } - Optional system apikey for unrestricted access.
+  must be passed in the `rootValue.apikey` property.
 
 ## GraphQL API
 
