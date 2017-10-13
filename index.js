@@ -832,9 +832,12 @@ var GraphQLFactoryACLPlugin = function () {
         try {
           var requiredPerm = _.get(this, 'fieldDef._factoryACL');
           var secret = _.get(_this.options, 'secret');
+          var args = resolverArgs.args,
+              info = resolverArgs.info;
 
           // if no jwt secret has been provided authentication is disabled
           // or if not marked as an ACL continue to the next middleware
+
           if (!requiredPerm || !secret) return next();
 
           // check for system api key
@@ -844,9 +847,6 @@ var GraphQLFactoryACLPlugin = function () {
           // otherwise continue acl check
           var errors = [];
           var GraphQLError = this.graphql.GraphQLError;
-          var args = resolverArgs.args,
-              info = resolverArgs.info;
-
           var op = _.get(info, 'operation.operation');
           var userIdField = _.get(_this.options, 'userIdField', 'userId');
           var schemaName = info.schema._factory.key;

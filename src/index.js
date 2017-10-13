@@ -193,6 +193,7 @@ export default class GraphQLFactoryACLPlugin {
       try {
         const requiredPerm = _.get(this, 'fieldDef._factoryACL')
         const secret = _.get(_this.options, 'secret')
+        const { args, info } = resolverArgs
 
         // if no jwt secret has been provided authentication is disabled
         // or if not marked as an ACL continue to the next middleware
@@ -205,7 +206,6 @@ export default class GraphQLFactoryACLPlugin {
         // otherwise continue acl check
         const errors = []
         const GraphQLError = this.graphql.GraphQLError
-        const { args, info } = resolverArgs
         const op = _.get(info, 'operation.operation')
         const userIdField = _.get(_this.options, 'userIdField', 'userId')
         const schemaName = info.schema._factory.key
